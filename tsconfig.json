@@ -1,0 +1,31 @@
+{
+    "compilerOptions": {
+        "incremental": false,
+        "moduleResolution": "node",
+        "inlineSources": false,
+        "removeComments": true,
+        "sourceMap": false,
+        "target": "es2020",
+        "module": "es2020",
+        "skipLibCheck": true,
+        "allowSyntheticDefaultImports": true,
+        "lib": [
+            "ESNEXT"
+        ],
+        "forceConsistentCasingInFileNames": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noImplicitAny": true,
+        "noUnusedParameters": true,
+        "noUnusedLocals": true,
+        "importHelpers": true,
+        "strict": true,
+        "outDir": "dist"
+    },
+    "include": [
+        "index.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

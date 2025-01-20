@@ -1,0 +1,35 @@
+{
+    "name": "monaco-liquid",
+    "version": "0.0.1",
+    "description": "Tiny OpenAI API wrapper",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": {
+        "start": "tsc -d --watch",
+        "build": "tsc -d"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ceifa/monaco-liquid.git"
+    },
+    "author": "ceifa",
+    "license": "MIT",
+    "keywords": [
+        "monaco",
+        "liquid",
+        "language"
+    ],
+    "bugs": {
+        "url": "https://github.com/ceifa/monaco-liquid/issues"
+    },
+    "homepage": "https://github.com/ceifa/monaco-liquid#readme",
+    "peerDependencies": {
+        "monaco-editor": ">=0.52"
+    },
+    "dependencies": {
+        "zod": "^3.24.1"
+    },
+    "devDependencies": {
+        "typescript": "^5.7.3"
+    }
+}

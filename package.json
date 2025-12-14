@@ -1,9 +1,20 @@
 {
     "name": "monaco-liquid",
-    "version": "0.0.1",
-    "description": "Tiny OpenAI API wrapper",
+    "version": "0.0.2",
+    "description": "Liquid templating language support for Monaco Editor with Zod schema validation",
     "type": "module",
     "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "sideEffects": false,
     "scripts": {
         "start": "tsc -d --watch",
         "build": "tsc -d",
@@ -17,8 +28,14 @@
     "license": "MIT",
     "keywords": [
         "monaco",
+        "monaco-editor",
         "liquid",
-        "language"
+        "liquidjs",
+        "language",
+        "syntax-highlighting",
+        "autocomplete",
+        "validation",
+        "zod"
     ],
     "bugs": {
         "url": "https://github.com/ceifa/monaco-liquid/issues"

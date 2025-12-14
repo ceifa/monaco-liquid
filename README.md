@@ -4,26 +4,15 @@ This package provides a seamless integration of the [Liquid templating language]
 
 ## Features
 
-1. **Language Registration:**
-   - Registers Liquid as a language within Monaco Editor.
-   - Adds support for Liquid's syntax, including tags, filters, variables, and expressions.
+- **Language Registration:** Registers Liquid as a language within Monaco Editor with support for Liquid's syntax, including tags, filters, variables, and expressions.
 
-2. **Syntax Highlighting:**
-   - Differentiates between Liquid tags, output delimiters, comments, strings, variables, and HTML content.
+- **Syntax Highlighting:** Differentiates between Liquid tags, output delimiters, comments, strings, variables, and HTML content.
 
-3. **Hover Support:**
-   - Displays type information for variables based on schemas defined using [Zod](https://github.com/colinhacks/zod).
+- **Hover Support:** Displays type information for variables based on schemas defined using [Zod](https://github.com/colinhacks/zod).
 
-4. **Validation:**
-   - Checks for unmatched or improperly nested Liquid tags and output delimiters.
-   - Marks syntax errors directly in the editor with appropriate error messages.
+- **Validation:** Checks for unmatched or improperly nested Liquid tags and output delimiters.
 
-5. **Autocomplete Suggestions:**
-   - Provides keyword suggestions for Liquid syntax.
-   - Suggests variables and properties based on the provided schemas.
-
-6. **Language Configuration:**
-   - Defines comment styles, bracket matching, auto-closing pairs, and folding markers.
+- **Autocomplete Suggestions:** Provides suggestions for Liquid syntax, variables, and properties based on the provided schemas.
 
 ---
 

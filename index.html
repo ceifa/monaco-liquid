@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>monaco-liquid Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 16px 24px;
+            background: #252526;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .schema-info {
+            font-size: 12px;
+            color: #9d9d9d;
+        }
+
+        .schema-info code {
+            background: #3c3c3c;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ce9178;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        #editor-container {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        aside {
+            width: 300px;
+            background: #252526;
+            border-left: 1px solid #3c3c3c;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        aside h2 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        aside h3 {
+            font-size: 12px;
+            font-weight: 500;
+            margin: 16px 0 8px;
+            color: #9d9d9d;
+            text-transform: uppercase;
+        }
+
+        .schema-display {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 11px;
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        .tip {
+            font-size: 12px;
+            color: #9d9d9d;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .tip strong {
+            color: #569cd6;
+        }
+
+        .tips-list {
+            list-style: none;
+            font-size: 12px;
+            color: #9d9d9d;
+        }
+
+        .tips-list li {
+            margin: 8px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .tips-list li::before {
+            content: '>';
+            position: absolute;
+            left: 0;
+            color: #569cd6;
+        }
+
+        footer {
+            padding: 8px 24px;
+            background: #007acc;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        footer a {
+            color: #fff;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>monaco-liquid</h1>
+        <div class="schema-info">
+            Available variables: <code>product</code>, <code>cart</code>, <code>customer</code>
+        </div>
+    </header>
+
+    <main>
+        <div id="editor-container"></div>
+        <aside>
+            <h2>Schema Reference</h2>
+            <div class="schema-display"><span style="color:#569cd6">product</span>: {
+  <span style="color:#9cdcfe">title</span>: <span style="color:#4ec9b0">String</span>
+  <span style="color:#9cdcfe">price</span>: <span style="color:#4ec9b0">Number</span>
+  <span style="color:#9cdcfe">available</span>: <span style="color:#4ec9b0">Boolean</span>
+  <span style="color:#9cdcfe">tags</span>: <span style="color:#4ec9b0">Array&lt;String&gt;</span>
+  <span style="color:#9cdcfe">variants</span>: <span style="color:#4ec9b0">Array&lt;Object&gt;</span>
+    <span style="color:#9cdcfe">.sku</span>: <span style="color:#4ec9b0">String</span>
+    <span style="color:#9cdcfe">.price</span>: <span style="color:#4ec9b0">Number</span>
+    <span style="color:#9cdcfe">.inventory</span>: <span style="color:#4ec9b0">Number</span>
+}
+
+<span style="color:#569cd6">cart</span>: {
+  <span style="color:#9cdcfe">item_count</span>: <span style="color:#4ec9b0">Number</span>
+  <span style="color:#9cdcfe">total_price</span>: <span style="color:#4ec9b0">Number</span>
+  <span style="color:#9cdcfe">items</span>: <span style="color:#4ec9b0">Array&lt;Object&gt;</span>
+    <span style="color:#9cdcfe">.title</span>: <span style="color:#4ec9b0">String</span>
+    <span style="color:#9cdcfe">.quantity</span>: <span style="color:#4ec9b0">Number</span>
+    <span style="color:#9cdcfe">.price</span>: <span style="color:#4ec9b0">Number</span>
+}
+
+<span style="color:#569cd6">customer</span>: {
+  <span style="color:#9cdcfe">name</span>: <span style="color:#4ec9b0">String</span>
+  <span style="color:#9cdcfe">email</span>: <span style="color:#4ec9b0">String</span>
+  <span style="color:#9cdcfe">orders_count</span>: <span style="color:#4ec9b0">Number</span>
+  <span style="color:#9cdcfe">tags</span>: <span style="color:#4ec9b0">Array&lt;String&gt;</span>
+  <span style="color:#9cdcfe">accepts_marketing</span>: <span style="color:#4ec9b0">Boolean</span>
+  <span style="color:#9cdcfe">status</span>: <span style="color:#4ec9b0">"active" | "disabled"</span>
+}</div>
+
+            <h3>Test Features</h3>
+            <ul class="tips-list">
+                <li>Type <strong>product.</strong> for autocomplete</li>
+                <li>Type <strong>cart.items[0].</strong> for nested</li>
+                <li>Hover over variables for type info</li>
+                <li>Type <strong>&#123;&#123;</strong> or <strong>&#123;%</strong> for tags</li>
+                <li>Try <strong>| upcase</strong> for filters</li>
+                <li>Delete an <strong>endif</strong> to see errors</li>
+            </ul>
+
+            <h3>Keyboard Shortcuts</h3>
+            <ul class="tips-list">
+                <li><strong>Ctrl+Space</strong> - Trigger autocomplete</li>
+                <li><strong>Ctrl+/</strong> - Toggle comment</li>
+                <li><strong>Ctrl+D</strong> - Select next occurrence</li>
+            </ul>
+        </aside>
+    </main>
+
+    <footer>
+        <span>monaco-liquid</span>
+        <a href="https://github.com/ceifa/monaco-liquid" target="_blank">GitHub</a>
+    </footer>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "zod": "https://cdn.jsdelivr.net/npm/zod@4.1.0/+esm"
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+    <script type="module">
+        import { z } from 'zod'
+        import { registerLiquidLanguage, setModelLiquidValidation } from './dist/index.js'
+
+        // Define schemas for testing
+        const variantSchema = z.object({
+            sku: z.string(),
+            price: z.number(),
+            inventory: z.number(),
+        })
+
+        const productSchema = z.object({
+            title: z.string(),
+            price: z.number(),
+            available: z.boolean(),
+            tags: z.array(z.string()),
+            variants: z.array(variantSchema),
+        })
+
+        const cartItemSchema = z.object({
+            title: z.string(),
+            quantity: z.number(),
+            price: z.number(),
+        })
+
+        const cartSchema = z.object({
+            item_count: z.number(),
+            total_price: z.number(),
+            items: z.array(cartItemSchema),
+        })
+
+        const customerSchema = z.object({
+            name: z.string(),
+            email: z.string(),
+            orders_count: z.number(),
+            tags: z.array(z.string()),
+            accepts_marketing: z.boolean(),
+            status: z.enum(['active', 'disabled']),
+        })
+
+        const schemas = {
+            product: productSchema,
+            cart: cartSchema,
+            customer: customerSchema,
+        }
+
+        // Sample Liquid template (Markdown)
+        const sampleTemplate = `{% comment %}
+  Sample Liquid Markdown Template
+  Test autocomplete, hover, and validation features
+{% endcomment %}
+
+# {{ product.title | upcase }}
+
+**Price:** \${{ product.price | divided_by: 100.0 | round: 2 }}
+
+{% if product.available %}
+> ✅ **In Stock**
+{% else %}
+> ❌ **Sold Out**
+{% endif %}
+
+{% if product.tags.size > 0 %}
+## Tags
+
+{% for tag in product.tags %}
+- {{ tag }}
+{% endfor %}
+{% endif %}
+
+## Variants
+
+| SKU | Price | Stock |
+|-----|-------|-------|
+{% for variant in product.variants %}
+| {{ variant.sku }} | \${{ variant.price }} | {{ variant.inventory }} |
+{% endfor %}
+
+---
+
+{% if customer %}
+## Welcome back, {{ customer.name }}!
+
+You have **{{ customer.orders_count }}** orders with us.
+
+{% case customer.status %}
+  {% when 'active' %}
+*Status:* 🟢 Active
+  {% when 'disabled' %}
+*Status:* 🔴 Disabled
+{% endcase %}
+
+{% if customer.accepts_marketing %}
+📧 Subscribed to marketing emails
+{% endif %}
+{% endif %}
+
+---
+
+{% if cart.item_count > 0 %}
+## Your Cart ({{ cart.item_count }} items)
+
+{% for item in cart.items %}
+### {{ item.title }}
+- **Quantity:** {{ item.quantity }}
+- **Price:** \${{ item.price }}
+
+{% endfor %}
+
+**Total:** \${{ cart.total_price }}
+{% endif %}
+`
+
+        // Initialize Monaco
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' } })
+
+        require(['vs/editor/editor.main'], function (monaco) {
+            // Register the Liquid language
+            registerLiquidLanguage(monaco)
+
+            // Create the editor
+            const editor = monaco.editor.create(document.getElementById('editor-container'), {
+                value: sampleTemplate,
+                language: 'liquid',
+                theme: 'vs-dark',
+                fontSize: 14,
+                fontFamily: "'Fira Code', Consolas, 'Courier New', monospace",
+                fontLigatures: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+                padding: { top: 16 },
+            })
+
+            // Set up validation with schemas
+            const disposable = setModelLiquidValidation(monaco, editor.getModel(), schemas)
+
+            // Log when disposed (for testing)
+            window.disposeLiquidValidation = () => {
+                disposable.dispose()
+                console.log('Liquid validation disposed')
+            }
+
+            console.log('monaco-liquid initialized!')
+            console.log('Available schemas:', Object.keys(schemas))
+            console.log('Call window.disposeLiquidValidation() to test disposal')
+        })
+    </script>
+</body>
+</html>

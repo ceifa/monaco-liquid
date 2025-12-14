@@ -1,12 +1,28 @@
 import type * as monaco from 'monaco-editor'
-import { ZodArray, ZodBoolean, ZodNumber, ZodObject, type ZodType, ZodString } from 'zod'
+import {
+    ZodArray,
+    ZodBoolean,
+    ZodDate,
+    ZodDefault,
+    ZodEnum,
+    ZodLiteral,
+    ZodNullable,
+    ZodNumber,
+    ZodObject,
+    ZodOptional,
+    type ZodType,
+    ZodString,
+    ZodUnion,
+} from 'zod'
 
-type ILiquidModel = monaco.editor.ITextModel & { schemas: Record<string, ZodType<unknown>> }
+type ILiquidModel = monaco.editor.ITextModel & { schemas?: Record<string, ZodType<unknown>> }
 
 export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
     monacoInstance.languages.register({ id: 'liquid' })
     monacoInstance.languages.registerHoverProvider('liquid', {
         provideHover: (model: ILiquidModel, position) => {
+            if (!model.schemas) return null
+
             const variablePath = getVariablePathAtPosition(model, position)
             if (variablePath) {
                 // Split the path by dots and brackets, filter out empty strings
@@ -18,16 +34,17 @@ export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
                     const pathWithoutVariableName = pathSegments.slice(1)
                     const typeInfo = getTypeInfoFromSchema(schema, pathWithoutVariableName)
                     if (typeInfo) {
+                        const word = model.getWordAtPosition(position)
                         return {
-                            range: model.getWordAtPosition(position)
+                            range: word
                                 ? new monacoInstance.Range(
                                       position.lineNumber,
-                                      model.getWordAtPosition(position)!.startColumn,
+                                      word.startColumn,
                                       position.lineNumber,
-                                      model.getWordAtPosition(position)!.endColumn,
+                                      word.endColumn,
                                   )
                                 : undefined,
-                            contents: [{ value: '**Type**' }, { value: `\`${typeInfo}\`` }],
+                            contents: [{ value: `**Type:** \`${typeInfo}\`` }],
                         }
                     }
                 }
@@ -142,7 +159,7 @@ export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
 
     monacoInstance.languages.setLanguageConfiguration('liquid', {
         comments: {
-            blockComment: ['{%', '%}'],
+            blockComment: ['{% comment %}', '{% endcomment %}'],
         },
         brackets: [
             ['{%', '%}'],
@@ -169,8 +186,8 @@ export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
         ],
         folding: {
             markers: {
-                start: /^\s*{%-?\s*(comment|raw|if|unless|case|for|tablerow|form|paginate|capture|schema|stylesheet|javascript|layout|block)\s*-?%}/,
-                end: /^\s*{%-?\s*end(comment|raw|if|unless|case|for|tablerow|form|paginate|capture|schema|stylesheet|javascript|layout|block)\s*-?%}/,
+                start: /{%-?\s*(comment|raw|if|unless|case|for|tablerow|form|paginate|capture|schema|stylesheet|javascript|layout|block|liquid)\b/,
+                end: /{%-?\s*end(comment|raw|if|unless|case|for|tablerow|form|paginate|capture|schema|stylesheet|javascript|layout|block|liquid)\s*-?%}/,
             },
         },
     })
@@ -180,19 +197,28 @@ export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
         provideCompletionItems: (model: ILiquidModel, position) => {
             const suggestions = [
                 ...getKeywordSuggestions(monacoInstance, position),
-                ...getSchemaSuggestions(monacoInstance, model, position, model.schemas),
+                ...(model.schemas ? getSchemaSuggestions(monacoInstance, model, position, model.schemas) : []),
             ]
             return { suggestions }
         },
     })
 }
 
-function getTypeInfoFromSchema(schema: ZodType, path: Array<string>): string | null {
-    let currentSchema: unknown = schema
+function unwrapSchema(schema: unknown): unknown {
+    if (schema instanceof ZodOptional || schema instanceof ZodNullable || schema instanceof ZodDefault) {
+        return unwrapSchema(schema._zod.def.innerType)
+    }
+    return schema
+}
+
+function navigateSchema(schema: ZodType, path: Array<string>): unknown | null {
+    let currentSchema: unknown = unwrapSchema(schema)
 
     for (const segment of path) {
+        currentSchema = unwrapSchema(currentSchema)
+
         if (currentSchema instanceof ZodArray) {
-            currentSchema = currentSchema.element
+            currentSchema = unwrapSchema(currentSchema.element)
         }
 
         if (/^\d+$/.test(segment)) {
@@ -209,31 +235,78 @@ function getTypeInfoFromSchema(schema: ZodType, path: Array<string>): string | n
         }
     }
 
-    if (currentSchema instanceof ZodArray) {
-        return 'Array'
-    } else if (currentSchema instanceof ZodObject) {
+    return unwrapSchema(currentSchema)
+}
+
+function getTypeString(schema: unknown): string {
+    const unwrapped = unwrapSchema(schema)
+
+    if (unwrapped instanceof ZodArray) {
+        const elementType = getTypeString(unwrapped.element)
+        return `Array<${elementType}>`
+    } else if (unwrapped instanceof ZodObject) {
         return 'Object'
-    } else if (currentSchema instanceof ZodString) {
+    } else if (unwrapped instanceof ZodString) {
         return 'String'
-    } else if (currentSchema instanceof ZodNumber) {
+    } else if (unwrapped instanceof ZodNumber) {
         return 'Number'
-    } else if (currentSchema instanceof ZodBoolean) {
+    } else if (unwrapped instanceof ZodBoolean) {
         return 'Boolean'
+    } else if (unwrapped instanceof ZodDate) {
+        return 'Date'
+    } else if (unwrapped instanceof ZodLiteral) {
+        const values = unwrapped._zod.def.values
+        const value = values[0]
+        return typeof value === 'string' ? `"${value}"` : String(value)
+    } else if (unwrapped instanceof ZodEnum) {
+        const entries = unwrapped._zod.def.entries
+        const values = Object.values(entries) as string[]
+        return values.map((v) => `"${v}"`).join(' | ')
+    } else if (unwrapped instanceof ZodUnion) {
+        const options = unwrapped._zod.def.options as ZodType[]
+        return options.map((opt) => getTypeString(opt)).join(' | ')
     } else {
         return 'Unknown'
     }
+}
+
+function getTypeInfoFromSchema(schema: ZodType, path: Array<string>): string | null {
+    const navigated = navigateSchema(schema, path)
+    if (navigated === null) return null
+    return getTypeString(navigated)
 }
 
 export const setModelLiquidValidation = (
     monacoInstance: typeof monaco,
     model: monaco.editor.ITextModel,
     schemas: Record<string, ZodType<unknown>>,
-) => {
+    options: { debounceMs?: number } = {},
+): monaco.IDisposable => {
+    const { debounceMs = 300 } = options
     ;(<ILiquidModel>model).schemas = schemas
     validateLiquidSyntax(monacoInstance, model)
-    model.onDidChangeContent(() => {
-        validateLiquidSyntax(monacoInstance, model)
+
+    let validationTimeout: number | undefined
+
+    const disposable = model.onDidChangeContent(() => {
+        if (validationTimeout !== undefined) {
+            window.clearTimeout(validationTimeout)
+        }
+        validationTimeout = window.setTimeout(() => {
+            validateLiquidSyntax(monacoInstance, model)
+            validationTimeout = undefined
+        }, debounceMs)
     })
+
+    return {
+        dispose: () => {
+            if (validationTimeout !== undefined) {
+                window.clearTimeout(validationTimeout)
+            }
+            disposable.dispose()
+            monacoInstance.editor.setModelMarkers(model, 'liquid', [])
+        },
+    }
 }
 
 function getKeywordSuggestions(monacoInstance: typeof monaco, position: monaco.Position): Array<monaco.languages.CompletionItem> {
@@ -344,8 +417,8 @@ function getKeywordSuggestions(monacoInstance: typeof monaco, position: monaco.P
 function getVariablePathAtPosition(model: monaco.editor.ITextModel, position: monaco.Position): string | null {
     const lineContent = model.getLineContent(position.lineNumber)
     const textUntilPosition = lineContent.substring(0, position.column - 1)
-    // Regex to match variable paths (e.g., order.cart[0].product)
-    const variablePathRegex = /[a-zA-Z_][\w\.\[\]]*$/
+    // Regex to match variable paths (e.g., order.cart[0].product, my-variable)
+    const variablePathRegex = /[a-zA-Z_][\w\-.\[\]]*$/
     const match = variablePathRegex.exec(textUntilPosition)
     if (match) {
         return match[0]
@@ -392,35 +465,30 @@ function getSchemaSuggestions(
     return []
 }
 
+function getCompletionKindForSchema(monacoInstance: typeof monaco, schema: unknown): monaco.languages.CompletionItemKind {
+    const unwrapped = unwrapSchema(schema)
+    if (unwrapped instanceof ZodArray) {
+        return monacoInstance.languages.CompletionItemKind.Variable
+    } else if (unwrapped instanceof ZodObject) {
+        return monacoInstance.languages.CompletionItemKind.Class
+    } else {
+        return monacoInstance.languages.CompletionItemKind.Property
+    }
+}
+
 function getSuggestionsFromSchema(
     monacoInstance: typeof monaco,
     schema: ZodType,
     path: Array<string>,
     range: monaco.Range,
 ): Array<monaco.languages.CompletionItem> {
-    let currentSchema: unknown = schema
+    const navigated = navigateSchema(schema, path)
+    if (navigated === null) return []
 
-    for (const segment of path) {
-        if (currentSchema instanceof ZodArray) {
-            currentSchema = currentSchema.element
-        }
-
-        if (/^\d+$/.test(segment)) {
-            // Skip array indices
-        } else if (currentSchema instanceof ZodObject) {
-            const shape = currentSchema.shape
-            if (Object.prototype.hasOwnProperty.call(shape, segment)) {
-                currentSchema = shape[segment]
-            } else {
-                return []
-            }
-        } else {
-            return []
-        }
-    }
+    let currentSchema = unwrapSchema(navigated)
 
     if (currentSchema instanceof ZodArray) {
-        currentSchema = currentSchema.element
+        currentSchema = unwrapSchema(currentSchema.element)
     }
 
     if (currentSchema instanceof ZodObject) {
@@ -429,44 +497,16 @@ function getSuggestionsFromSchema(
         for (const key in shape) {
             if (Object.prototype.hasOwnProperty.call(shape, key)) {
                 const value = shape[key]
-                let kind = monacoInstance.languages.CompletionItemKind.Field
-                let detail = ''
-                let documentation = ''
-
-                if (value instanceof ZodArray) {
-                    kind = monacoInstance.languages.CompletionItemKind.Variable
-                    detail = 'Array'
-                    documentation = 'Type: Array'
-                } else if (value instanceof ZodObject) {
-                    kind = monacoInstance.languages.CompletionItemKind.Class
-                    detail = 'Object'
-                    documentation = 'Type: Object'
-                } else if (value instanceof ZodString) {
-                    kind = monacoInstance.languages.CompletionItemKind.Property
-                    detail = 'String'
-                    documentation = 'Type: String'
-                } else if (value instanceof ZodNumber) {
-                    kind = monacoInstance.languages.CompletionItemKind.Property
-                    detail = 'Number'
-                    documentation = 'Type: Number'
-                } else if (value instanceof ZodBoolean) {
-                    kind = monacoInstance.languages.CompletionItemKind.Property
-                    detail = 'Boolean'
-                    documentation = 'Type: Boolean'
-                } else {
-                    kind = monacoInstance.languages.CompletionItemKind.Property
-                    detail = 'Unknown'
-                    documentation = 'Type: Unknown'
-                }
+                const typeString = getTypeString(value)
 
                 suggestions.push({
                     label: key,
-                    kind,
+                    kind: getCompletionKindForSchema(monacoInstance, value),
                     insertText: key,
-                    detail,
-                    documentation,
+                    detail: typeString,
+                    documentation: { value: `**Type:** \`${typeString}\`` },
                     range,
-                    sortText: `1${key}`, // Sort properties after variables
+                    sortText: `1${key}`,
                 })
             }
         }
@@ -481,7 +521,7 @@ function validateLiquidSyntax(monacoInstance: typeof monaco, model: monaco.edito
     const lines = text.split(/\r?\n/)
 
     const markers: Array<monaco.editor.IMarkerData> = []
-    const stack: Array<{ tag: string; lineNumber: number; column: number }> = []
+    const stack: Array<{ tag: string; lineNumber: number; column: number; length: number }> = []
 
     const tagRegex = /{%-?\s*(\w+)(?:\s[^%]*)?-?%}/g
     const endTagRegex = /{%-?\s*end(\w+)\s*-?%}/g
@@ -516,17 +556,12 @@ function validateLiquidSyntax(monacoInstance: typeof monaco, model: monaco.edito
         outputMatches.sort((a, b) => a.index - b.index)
         outputMatches.forEach((outputMatch) => {
             if (outputMatch.type === 'start') {
-                stack.push({ tag: 'output', lineNumber, column: outputMatch.index + 1 })
+                stack.push({ tag: 'output', lineNumber, column: outputMatch.index + 1, length: 2 })
             } else {
                 // outputMatch.type === 'end'
-                let last: typeof stack[number] | undefined
-                while (stack.length > 0) {
-                    last = stack.pop()
-                    if (last?.tag === 'output') {
-                        break
-                    }
-                }
-                if (!last || last.tag !== 'output') {
+                // Only look for matching output tag, don't pop block tags
+                const outputIndex = stack.findLastIndex((item) => item.tag === 'output')
+                if (outputIndex === -1) {
                     // Unmatched closing output tag
                     markers.push({
                         severity: monacoInstance.MarkerSeverity.Error,
@@ -536,6 +571,8 @@ function validateLiquidSyntax(monacoInstance: typeof monaco, model: monaco.edito
                         endLineNumber: lineNumber,
                         endColumn: outputMatch.index + 3,
                     })
+                } else {
+                    stack.splice(outputIndex, 1)
                 }
             }
         })
@@ -547,7 +584,7 @@ function validateLiquidSyntax(monacoInstance: typeof monaco, model: monaco.edito
 
             // Exclude end tags from opening tag regex matches
             if (!tag.startsWith('end') && isBlockTag(tag)) {
-                stack.push({ tag, lineNumber, column: position + 1 })
+                stack.push({ tag, lineNumber, column: position + 1, length: match[0].length })
             }
 
             match = tagRegex.exec(lineContent)
@@ -588,20 +625,16 @@ function validateLiquidSyntax(monacoInstance: typeof monaco, model: monaco.edito
     })
 
     while (stack.length > 0) {
-        const unmatchedTag = stack.pop()
-        let message = ''
-        if (unmatchedTag?.tag === 'output') {
-            message = `Unclosed output tag '{{'`
-        } else {
-            message = `Unclosed tag '${unmatchedTag?.tag}'`
-        }
+        const unmatchedTag = stack.pop()!
+        const message =
+            unmatchedTag.tag === 'output' ? `Unclosed output tag '{{'` : `Unclosed tag '${unmatchedTag.tag}'`
         markers.push({
             severity: monacoInstance.MarkerSeverity.Error,
             message,
-            startLineNumber: unmatchedTag?.lineNumber || 1,
-            startColumn: unmatchedTag?.column || 1,
-            endLineNumber: unmatchedTag?.lineNumber || 1,
-            endColumn: unmatchedTag?.column || 1,
+            startLineNumber: unmatchedTag.lineNumber,
+            startColumn: unmatchedTag.column,
+            endLineNumber: unmatchedTag.lineNumber,
+            endColumn: unmatchedTag.column + unmatchedTag.length,
         })
     }
 
@@ -624,6 +657,7 @@ const blockTags: Array<string> = [
     'schema',
     'stylesheet',
     'javascript',
+    'liquid',
 ]
 
 function isBlockTag(tag: string): boolean {

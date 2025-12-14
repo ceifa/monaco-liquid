@@ -6,7 +6,8 @@
     "main": "dist/index.js",
     "scripts": {
         "start": "tsc -d --watch",
-        "build": "tsc -d"
+        "build": "tsc -d",
+        "test": "npx serve -l 3000"
     },
     "repository": {
         "type": "git",
@@ -28,6 +29,7 @@
         "zod": ">=4.1"
     },
     "devDependencies": {
+        "serve": "^14.2.5",
         "typescript": "^5.9.3"
     }
 }

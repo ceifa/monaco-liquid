@@ -10,7 +10,8 @@
         "skipLibCheck": true,
         "allowSyntheticDefaultImports": true,
         "lib": [
-            "ESNEXT"
+            "ESNEXT",
+            "DOM"
         ],
         "forceConsistentCasingInFileNames": true,
         "noImplicitReturns": true,

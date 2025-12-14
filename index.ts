@@ -1,7 +1,7 @@
 import type * as monaco from 'monaco-editor'
-import { ZodArray, ZodBoolean, ZodNumber, ZodObject, type ZodSchema, ZodString, type ZodTypeAny } from 'zod'
+import { ZodArray, ZodBoolean, ZodNumber, ZodObject, type ZodType, ZodString } from 'zod'
 
-type ILiquidModel = monaco.editor.ITextModel & { schemas: Record<string, ZodSchema<unknown>> }
+type ILiquidModel = monaco.editor.ITextModel & { schemas: Record<string, ZodType<unknown>> }
 
 export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
     monacoInstance.languages.register({ id: 'liquid' })
@@ -187,8 +187,8 @@ export const registerLiquidLanguage = (monacoInstance: typeof monaco) => {
     })
 }
 
-function getTypeInfoFromSchema(schema: ZodTypeAny, path: Array<string>): string | null {
-    let currentSchema = schema
+function getTypeInfoFromSchema(schema: ZodType, path: Array<string>): string | null {
+    let currentSchema: unknown = schema
 
     for (const segment of path) {
         if (currentSchema instanceof ZodArray) {
@@ -227,7 +227,7 @@ function getTypeInfoFromSchema(schema: ZodTypeAny, path: Array<string>): string 
 export const setModelLiquidValidation = (
     monacoInstance: typeof monaco,
     model: monaco.editor.ITextModel,
-    schemas: Record<string, ZodSchema<unknown>>,
+    schemas: Record<string, ZodType<unknown>>,
 ) => {
     ;(<ILiquidModel>model).schemas = schemas
     validateLiquidSyntax(monacoInstance, model)
@@ -357,7 +357,7 @@ function getSchemaSuggestions(
     monacoInstance: typeof monaco,
     model: monaco.editor.ITextModel,
     position: monaco.Position,
-    schemas: Record<string, ZodSchema<unknown>>,
+    schemas: Record<string, ZodType<unknown>>,
 ): Array<monaco.languages.CompletionItem> {
     const wordUntilPosition = model.getWordUntilPosition(position)
     const range = new monacoInstance.Range(
@@ -394,11 +394,11 @@ function getSchemaSuggestions(
 
 function getSuggestionsFromSchema(
     monacoInstance: typeof monaco,
-    schema: ZodTypeAny,
+    schema: ZodType,
     path: Array<string>,
     range: monaco.Range,
 ): Array<monaco.languages.CompletionItem> {
-    let currentSchema = schema
+    let currentSchema: unknown = schema
 
     for (const segment of path) {
         if (currentSchema instanceof ZodArray) {

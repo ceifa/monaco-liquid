@@ -24,12 +24,10 @@
     },
     "homepage": "https://github.com/ceifa/monaco-liquid#readme",
     "peerDependencies": {
-        "monaco-editor": ">=0.52"
-    },
-    "dependencies": {
-        "zod": "^3.24.1"
+        "monaco-editor": ">=0.52",
+        "zod": ">=4.1"
     },
     "devDependencies": {
-        "typescript": "^5.7.3"
+        "typescript": "^5.9.3"
     }
 }

@@ -35,7 +35,15 @@ const TAG_BOUNDARY = /"[^"\n]*"|'[^'\n]*'|%\}|\{\{|\{%/g
 const INLINE_COMMENT_BOUNDARY = /%\}/g
 const RAW_BODY_TAGS = new Set(['comment', 'raw', 'doc'])
 
+// Completion, hover and validation of one edit all scan the same text; keep the last result. Treat it as read-only.
+let last: { text: string; result: ScanResult } | undefined
+
 export function scan(text: string): ScanResult {
+    if (last?.text !== text) last = { text, result: scanText(text) }
+    return last.result
+}
+
+function scanText(text: string): ScanResult {
     const nodes: Array<LiquidNode> = []
     const rawBodies: Array<RawBody> = []
     let position = 0

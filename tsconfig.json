@@ -1,32 +1,21 @@
 {
     "compilerOptions": {
-        "incremental": false,
-        "moduleResolution": "node",
-        "inlineSources": false,
-        "removeComments": true,
-        "sourceMap": false,
-        "target": "es2020",
-        "module": "es2020",
-        "skipLibCheck": true,
-        "allowSyntheticDefaultImports": true,
-        "lib": [
-            "ESNEXT",
-            "DOM"
-        ],
-        "forceConsistentCasingInFileNames": true,
-        "noImplicitReturns": true,
-        "noImplicitThis": true,
-        "noImplicitAny": true,
-        "noUnusedParameters": true,
-        "noUnusedLocals": true,
-        "importHelpers": true,
+        "target": "es2023",
+        "lib": ["es2023", "dom"],
+        "module": "nodenext",
+        "rootDir": "src",
+        "outDir": "dist",
+        "types": [],
+        "declaration": true,
         "strict": true,
-        "outDir": "dist"
+        "noUncheckedIndexedAccess": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "verbatimModuleSyntax": true,
+        "erasableSyntaxOnly": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true
     },
-    "include": [
-        "index.ts"
-    ],
-    "exclude": [
-        "node_modules"
-    ]
+    "include": ["src"]
 }

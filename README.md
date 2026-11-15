@@ -21,8 +21,10 @@ This package provides a seamless integration of the [Liquid templating language]
 Install the package via npm:
 
 ```bash
-npm install monaco-liquid
+npm install monaco-liquid monaco-editor zod
 ```
+
+Requires `monaco-editor` 0.52 or newer and Zod 4 (`zod` or `zod/mini`).
 
 ---
 
@@ -65,18 +67,19 @@ if (model) {
 
 ## API
 
-### `registerLiquidLanguage(monacoInstance: typeof monaco): void`
+### `registerLiquidLanguage(monacoInstance): IDisposable`
 
-Registers the Liquid language with the Monaco Editor, enabling syntax highlighting, hover support, and autocompletion.
+Registers the Liquid language with the Monaco Editor, enabling syntax highlighting, hover support, and autocompletion. Accepts both the full `monaco-editor` entry and the tree-shakeable `monaco-editor/editor` one. Calling it more than once is safe; everything is unregistered once all returned disposables are disposed.
 
-### `setModelLiquidValidation(monacoInstance: typeof monaco, model: monaco.editor.ITextModel, schemas: Record<string, ZodSchema<unknown>>): void`
+### `setModelLiquidValidation(monacoInstance, model, schemas?, options?): IDisposable`
 
-Associates schemas with the editor model and validates Liquid syntax.
+Associates schemas with the editor model and validates Liquid syntax as it changes. Dispose it to stop validating and clear the markers.
 
 - **Parameters:**
   - `monacoInstance`: The Monaco instance.
   - `model`: The Monaco text model where Liquid content is written.
   - `schemas`: A record of Zod schemas defining the structure of variables used in Liquid templates.
+  - `options.debounceMs`: Delay before re-validating after an edit (default `300`).
 
 ---
 
@@ -97,7 +100,7 @@ const schemas = {
 ```
 
 ### Autocomplete
-When typing `product.`, the editor will suggest `name`, `price`, and `tags`. For nested properties, suggestions are context-aware.
+When typing `product.`, the editor will suggest `name`, `price`, and `tags`. For nested properties, suggestions are context-aware, and loop variables (`{% for tag in product.tags %}`) and `assign`ed paths are typed too.
 
 ### Hover
 Hovering over `product.price` will display the type as `Number`.

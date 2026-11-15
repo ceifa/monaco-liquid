@@ -187,6 +187,7 @@
                 <li>Type <strong>product.</strong> for autocomplete</li>
                 <li>Type <strong>cart.items[0].</strong> for nested</li>
                 <li>Hover over variables for type info</li>
+                <li>Loop variables like <strong>item.</strong> are typed too</li>
                 <li>Type <strong>&#123;&#123;</strong> or <strong>&#123;%</strong> for tags</li>
                 <li>Try <strong>| upcase</strong> for filters</li>
                 <li>Delete an <strong>endif</strong> to see errors</li>
@@ -209,11 +210,11 @@
     <script type="importmap">
             {
                 "imports": {
-                    "zod": "https://cdn.jsdelivr.net/npm/zod@4.1.0/+esm"
+                    "zod": "https://cdn.jsdelivr.net/npm/zod@4.6.7/+esm"
                 }
             }
         </script>
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs/loader.js"></script>
     <script type="module">
         import { z } from 'zod'
 
@@ -221,7 +222,7 @@
             location.hostname,
         )
             ? await import('./dist/index.js')
-            : await import('https://cdn.jsdelivr.net/npm/monaco-liquid')
+            : await import('https://cdn.jsdelivr.net/npm/monaco-liquid@0.1/dist/index.js')
 
         // Define schemas for testing
         const variantSchema = z.object({
@@ -333,7 +334,7 @@ You have **{{ customer.orders_count }}** orders with us.
 `
 
         // Initialize Monaco
-        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs' } })
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs' } })
 
         require(['vs/editor/editor.main'], function (monaco) {
             // Register the Liquid language

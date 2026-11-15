@@ -13,10 +13,24 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v7
               with:
-                  node-version: 24
-            - run: npm ci
-            - run: npm run build
-            - run: npm publish
+                  node-version: 26
+                  cache: npm
+            - name: Skip if this version is already published
+              id: version
+              run: |
+                  version=$(node -p "require('./package.json').version")
+                  if npm view "monaco-liquid@$version" version >/dev/null 2>&1; then
+                      echo "monaco-liquid@$version is already on npm"
+                      echo "publish=false" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "publish=true" >> "$GITHUB_OUTPUT"
+                  fi
+            - if: steps.version.outputs.publish == 'true'
+              run: npm ci
+            - if: steps.version.outputs.publish == 'true'
+              run: npm test
+            - if: steps.version.outputs.publish == 'true'
+              run: npm publish

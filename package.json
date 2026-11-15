@@ -1,6 +1,6 @@
 {
     "name": "monaco-liquid",
-    "version": "0.0.2",
+    "version": "0.1.0",
     "description": "Liquid templating language support for Monaco Editor with Zod schema validation",
     "type": "module",
     "main": "dist/index.js",
@@ -16,9 +16,12 @@
     ],
     "sideEffects": false,
     "scripts": {
-        "start": "tsc -d --watch",
-        "build": "tsc -d",
-        "test": "npx serve -l 3000"
+        "build": "tsc",
+        "start": "tsc --watch",
+        "typecheck": "npm run build && tsc -p tsconfig.test.json",
+        "test": "npm run build && node --import ./test/setup.ts --test --test-force-exit \"test/*.test.ts\"",
+        "demo": "npm run build && serve -l 3000",
+        "prepack": "npm run build"
     },
     "repository": {
         "type": "git",
@@ -43,10 +46,15 @@
     "homepage": "https://github.com/ceifa/monaco-liquid#readme",
     "peerDependencies": {
         "monaco-editor": ">=0.52",
-        "zod": ">=4.1"
+        "zod": "^4.0.0"
     },
     "devDependencies": {
-        "serve": "^14.2.5",
-        "typescript": "^5.9.3"
+        "@types/jsdom": "^30.0.0",
+        "@types/node": "^26.6.6",
+        "jsdom": "^31.0.1",
+        "monaco-editor": "^0.57.0",
+        "serve": "^14.2.8",
+        "typescript": "^7.0.2",
+        "zod": "^4.6.7"
     }
 }

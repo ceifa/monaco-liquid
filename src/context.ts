@@ -27,7 +27,8 @@ export function getCursorContext(text: string, offset: number, schemas: Schemas 
     if (node.kind === 'tag' && /^\s*\w*$/.test(before)) return { kind: 'tag' }
     if (/\|\s*\w*$/.test(before)) return { kind: 'filter' }
 
-    const [, expression, dot] = TRAILING_PATH.exec(before) ?? []
+    // Paths are short; bounding the input keeps the end-anchored regex from going quadratic on long words.
+    const [, expression, dot] = TRAILING_PATH.exec(before.slice(-256)) ?? []
     const segments = expression === undefined ? [] : splitPath(expression)
     const path = dot ? segments : segments.slice(0, -1)
     return { kind: 'expression', path: path.length > 0 ? path : null, scope: getScope(nodes, offset, schemas) }

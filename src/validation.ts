@@ -1,7 +1,6 @@
 import { scan, type LiquidNode } from './scanner.js'
 
 export interface Diagnostic {
-    severity: 'error' | 'warning'
     message: string
     start: number
     end: number
@@ -35,15 +34,16 @@ const BRANCH_PARENTS = new Map([
 ])
 
 export function validate(text: string): Array<Diagnostic> {
-    const { nodes, rawBodies } = scan(text)
+    const { nodes } = scan(text)
     const diagnostics: Array<Diagnostic> = []
     const stack: Array<LiquidNode> = []
+    // Open blocks per name, so an unmatched end tag doesn't search the whole stack.
+    const openCount = new Map<string, number>()
 
     const blockTags = new Set(BLOCK_TAGS)
     for (const node of nodes) if (node.name.startsWith('end') && node.name.length > 3) blockTags.add(node.name.slice(3))
 
-    const error = (message: string, start: number, end: number, severity: Diagnostic['severity'] = 'error') =>
-        diagnostics.push({ severity, message, start, end })
+    const error = (message: string, start: number, end: number) => diagnostics.push({ message, start, end })
 
     for (const node of nodes) {
         if (!node.closed) {
@@ -56,16 +56,19 @@ export function validate(text: string): Array<Diagnostic> {
         const name = node.name
         if (name.startsWith('end') && blockTags.has(name.slice(3))) {
             const tag = name.slice(3)
-            const index = stack.findLastIndex((open) => open.name === tag)
-            if (index === -1) {
+            if (!openCount.get(tag)) {
                 error(`Unexpected '${name}', there is no open '${tag}'`, node.start, node.end)
                 continue
             }
-            for (const unclosed of stack.splice(index).slice(1).reverse()) {
-                error(`'${unclosed.name}' is not closed before '${name}'`, unclosed.start, unclosed.end)
+            const [, ...unclosed] = stack.splice(stack.findLastIndex((open) => open.name === tag))
+            openCount.set(tag, openCount.get(tag)! - 1)
+            for (const inner of unclosed.reverse()) {
+                openCount.set(inner.name, openCount.get(inner.name)! - 1)
+                error(`'${inner.name}' is not closed before '${name}'`, inner.start, inner.end)
             }
         } else if (blockTags.has(name)) {
             stack.push(node)
+            openCount.set(name, (openCount.get(name) ?? 0) + 1)
         } else if (BRANCH_PARENTS.has(name)) {
             const parents = BRANCH_PARENTS.get(name)!
             const parent = stack.at(-1)?.name
@@ -77,18 +80,6 @@ export function validate(text: string): Array<Diagnostic> {
 
     for (const unclosed of stack.reverse()) {
         error(`'${unclosed.name}' is not closed, expected 'end${unclosed.name}'`, unclosed.start, unclosed.end)
-    }
-
-    // Stray closers are plain text to Liquid, but usually a typo.
-    const spans = [...nodes, ...rawBodies].sort((a, b) => a.start - b.start)
-    let position = 0
-    for (const span of [...spans, { start: text.length, end: text.length }]) {
-        const gap = text.slice(position, span.start)
-        for (const match of gap.matchAll(/\}\}|%\}/g)) {
-            const start = position + match.index
-            error(`'${match[0]}' has no matching opening delimiter`, start, start + 2, 'warning')
-        }
-        position = Math.max(position, span.end)
     }
 
     return diagnostics.sort((a, b) => a.start - b.start)

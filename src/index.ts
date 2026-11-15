@@ -67,11 +67,16 @@ function register(api: MonacoApi) {
     // The full `monaco-editor` bundle ships its own basic `liquid` definition. It loads lazily and, once loaded,
     // replaces our language configuration (and our tokenizer, if a model was already open). Its extension point
     // carries the `loader` it uses; re-apply ours once that has settled, now and whenever a liquid model first appears.
-    const builtin = languages.getLanguages().find((language) => language.id === LANGUAGE_ID) as { loader?: () => Promise<unknown> }
     const reapplyAfterBuiltin = async () => {
-        if (typeof builtin?.loader !== 'function') return
+        // Looked up on each call: the built-in definition may be registered after us (`monaco-editor/editor` + its register module).
+        const builtin = languages
+            .getLanguages()
+            .filter((language) => language.id === LANGUAGE_ID)
+            .map((language) => (language as { loader?: unknown }).loader)
+            .find((loader) => typeof loader === 'function') as (() => Promise<unknown>) | undefined
+        if (!builtin) return
         try {
-            await builtin.loader()
+            await builtin()
         } catch {
             return
         }
@@ -109,7 +114,7 @@ export function setModelLiquidValidation(
             const start = model.getPositionAt(diagnostic.start)
             const end = model.getPositionAt(diagnostic.end)
             return {
-                severity: diagnostic.severity === 'error' ? api.MarkerSeverity.Error : api.MarkerSeverity.Warning,
+                severity: api.MarkerSeverity.Error,
                 message: diagnostic.message,
                 startLineNumber: start.lineNumber,
                 startColumn: start.column,

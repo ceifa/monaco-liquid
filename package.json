@@ -18,7 +18,7 @@
     "scripts": {
         "build": "tsc",
         "start": "tsc --watch",
-        "typecheck": "tsc -p tsconfig.test.json",
+        "typecheck": "npm run build && tsc -p tsconfig.test.json",
         "test": "npm run build && node --import ./test/setup.ts --test --test-force-exit \"test/*.test.ts\"",
         "demo": "npm run build && serve -l 3000",
         "prepack": "npm run build"

@@ -29,6 +29,10 @@ export interface ScanResult {
 }
 
 const OPENER = /\{\{|\{%/g
+// Quoted strings are matched (and skipped) so delimiters inside them don't count.
+const OUTPUT_BOUNDARY = /"[^"\n]*"|'[^'\n]*'|\}\}|\{\{|\{%/g
+const TAG_BOUNDARY = /"[^"\n]*"|'[^'\n]*'|%\}|\{\{|\{%/g
+const INLINE_COMMENT_BOUNDARY = /%\}/g
 const RAW_BODY_TAGS = new Set(['comment', 'raw', 'doc'])
 
 export function scan(text: string): ScanResult {
@@ -64,15 +68,17 @@ function readNode(text: string, start: number): LiquidNode {
     let contentStart = start + 2
     if (text[contentStart] === '-') contentStart++
 
-    // A new opener before the closer means this one was never closed.
-    OPENER.lastIndex = contentStart
-    const nextOpener = OPENER.exec(text)
-    const limit = nextOpener ? nextOpener.index : text.length
-    const closerIndex = text.indexOf(closer, contentStart)
-    const closed = closerIndex !== -1 && closerIndex < limit
+    // Whichever comes first: our closer, or a new opener, which means this one was never closed.
+    const inlineComment = kind === 'tag' && /\s*#/y.test(text.slice(contentStart, contentStart + 64))
+    const boundary = kind === 'output' ? OUTPUT_BOUNDARY : inlineComment ? INLINE_COMMENT_BOUNDARY : TAG_BOUNDARY
+    boundary.lastIndex = contentStart
+    let next = boundary.exec(text)
+    while (next && (next[0][0] === '"' || next[0][0] === "'")) next = boundary.exec(text)
+    const stop = next ? next.index : text.length
+    const closed = next?.[0] === closer
 
-    const end = closed ? closerIndex + 2 : limit
-    let contentEnd = closed ? closerIndex : limit
+    const end = closed ? stop + 2 : stop
+    let contentEnd = stop
     if (closed && contentEnd > contentStart && text[contentEnd - 1] === '-') contentEnd--
 
     const content = text.slice(contentStart, contentEnd)

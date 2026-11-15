@@ -69,7 +69,7 @@ if (model) {
 
 ### `registerLiquidLanguage(monacoInstance): IDisposable`
 
-Registers the Liquid language with the Monaco Editor, enabling syntax highlighting, hover support, and autocompletion. Accepts both the full `monaco-editor` entry and the tree-shakeable `monaco-editor/editor` one. Calling it more than once is safe; everything is unregistered once all returned disposables are disposed.
+Registers the Liquid language with the Monaco Editor, enabling syntax highlighting, hover support, and autocompletion. Accepts both the full `monaco-editor` entry and the tree-shakeable `monaco-editor/editor` one. Calling it more than once is safe; the providers and tokenizer are removed once all returned disposables are disposed.
 
 ### `setModelLiquidValidation(monacoInstance, model, schemas?, options?): IDisposable`
 

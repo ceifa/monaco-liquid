@@ -135,6 +135,29 @@ export const languageConfiguration: monaco.languages.LanguageConfiguration = {
     },
 }
 
+const CLOSER = /-?%\}|-?\}\}/
+const STATEMENT_START = /^\s*[A-Za-z_]/
+
+function filterState(args: string, statement: boolean): Array<monaco.languages.IMonarchLanguageRule> {
+    return [
+        ...(statement ? [[STATEMENT_START, '@rematch', '@pop'] as monaco.languages.IMonarchLanguageRule] : []),
+        [/\s+/, ''],
+        [/[A-Za-z_]\w*/, { token: 'function', switchTo: args }],
+        [CLOSER, '@rematch', '@pop'],
+        [/./, '', '@pop'],
+    ]
+}
+
+function filterArgsState(filter: string, statement: boolean): Array<monaco.languages.IMonarchLanguageRule> {
+    return [
+        [/\|/, { token: 'delimiter', switchTo: filter }],
+        [CLOSER, '@rematch', '@pop'],
+        ...(statement ? [[STATEMENT_START, '@rematch', '@pop'] as monaco.languages.IMonarchLanguageRule] : []),
+        [/([A-Za-z_][\w-]*)(\s*)(:)/, ['attribute.name', '', 'delimiter']],
+        { include: '@expression' },
+    ]
+}
+
 export const monarchLanguage: monaco.languages.IMonarchLanguage = {
     defaultToken: '',
     tokenPostfix: '.liquid',
@@ -145,9 +168,6 @@ export const monarchLanguage: monaco.languages.IMonarchLanguage = {
 
     tokenizer: {
         root: [
-            [/(\{%-?)(\s*)(comment)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@commentBody' }]],
-            [/(\{%-?)(\s*)(doc)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@docBody' }]],
-            [/(\{%-?)(\s*)(raw)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@rawBody' }]],
             { include: '@liquid' },
             [/<!--/, 'comment.html', '@htmlComment'],
             [/(<\/?)([\w:-]+)/, ['delimiter.html', { token: 'tag.html', next: '@htmlTag' }]],
@@ -157,8 +177,11 @@ export const monarchLanguage: monaco.languages.IMonarchLanguage = {
 
         // Shared by every state where Liquid can start, including inside HTML tags and attribute values.
         liquid: [
+            [/(\{%-?)(\s*)(comment)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@commentBody' }]],
+            [/(\{%-?)(\s*)(doc)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@docBody' }]],
+            [/(\{%-?)(\s*)(raw)(\s*)(-?%\})/, ['delimiter.tag', '', 'keyword', '', { token: 'delimiter.tag', next: '@rawBody' }]],
             [/(\{%-?)(\s*)(#)/, ['delimiter.tag', '', { token: 'comment', next: '@inlineComment' }]],
-            [/(\{%-?)(\s*)(liquid)\b/, ['delimiter.tag', '', { token: 'keyword', next: '@liquidTag' }]],
+            [/(\{%-?)(\s*)(liquid)\b/, ['delimiter.tag', '', { token: 'keyword', next: '@liquidTagStart' }]],
             [/(\{%-?)(\s*)([A-Za-z_]\w*)/, ['delimiter.tag', '', tagName('@tag')]],
             [/\{%-?/, 'delimiter.tag', '@tag'],
             [/\{\{-?/, 'delimiter.output', '@output'],
@@ -168,8 +191,28 @@ export const monarchLanguage: monaco.languages.IMonarchLanguage = {
 
         tag: [[/-?%\}/, 'delimiter.tag', '@pop'], { include: '@expression' }],
 
-        // `{% liquid %}`: one tag per line, no delimiters.
-        liquidTag: [[/-?%\}/, 'delimiter.tag', '@pop'], [/^(\s*)([A-Za-z_]\w*)/, ['', tagName()]], { include: '@expression' }],
+        // `{% liquid %}`: one tag per line, no delimiters. The first one may follow `liquid` on the same line.
+        liquidTagStart: [
+            [/-?%\}/, 'delimiter.tag', '@pop'],
+            [/\s+/, ''],
+            [
+                /[A-Za-z_]\w*/,
+                {
+                    cases: {
+                        '@controlTags': { token: 'keyword.control', switchTo: '@liquidTag' },
+                        '@default': { token: 'keyword', switchTo: '@liquidTag' },
+                    },
+                },
+            ],
+            [/./, { token: '', switchTo: '@liquidTag' }],
+        ],
+
+        liquidTag: [
+            [/-?%\}/, 'delimiter.tag', '@pop'],
+            [/^(\s*)([A-Za-z_]\w*)/, ['', tagName()]],
+            [/\|/, 'delimiter', '@statementFilter'],
+            { include: '@expression' },
+        ],
 
         expression: [
             [/\s+/, ''],
@@ -179,7 +222,7 @@ export const monarchLanguage: monaco.languages.IMonarchLanguage = {
             [/==|!=|<>|<=|>=|<|>|=/, 'operator'],
             [/\.\./, 'operator'],
             [
-                /[A-Za-z_][\w-]*\??/,
+                /[A-Za-z_](?:[\w-]*\w)?\??/,
                 {
                     cases: {
                         '@constants': 'constant',
@@ -193,21 +236,11 @@ export const monarchLanguage: monaco.languages.IMonarchLanguage = {
         ],
 
         // After `|`: the filter name, then its arguments until the next `|` or the closing delimiter.
-        filter: [
-            [/^\s*[A-Za-z_]/, '@rematch', '@pop'],
-            [/\s+/, ''],
-            [/[A-Za-z_]\w*/, { token: 'function', switchTo: '@filterArgs' }],
-            [/-?%\}|-?\}\}/, '@rematch', '@pop'],
-            [/./, '', '@pop'],
-        ],
-
-        filterArgs: [
-            [/\|/, { token: 'delimiter', switchTo: '@filter' }],
-            [/-?%\}|-?\}\}/, '@rematch', '@pop'],
-            [/^(\s*)([A-Za-z_]\w*)/, '@rematch', '@pop'],
-            [/([A-Za-z_][\w-]*)(\s*)(:)/, ['attribute.name', '', 'delimiter']],
-            { include: '@expression' },
-        ],
+        filter: filterState('@filterArgs', false),
+        filterArgs: filterArgsState('@filter', false),
+        // Inside `{% liquid %}` a new line starts a new statement, which also ends the filter chain.
+        statementFilter: filterState('@statementFilterArgs', true),
+        statementFilterArgs: filterArgsState('@statementFilter', true),
 
         inlineComment: [
             [/-?%\}/, 'delimiter.tag', '@pop'],

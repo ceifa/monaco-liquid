@@ -65,9 +65,21 @@ test('reports branches outside their block', () => {
     assert.deepEqual(messages('{% if a %}{% when 1 %}{% endif %}'), ["'when' must be inside 'case'"])
 })
 
-test('warns about stray closing delimiters', () => {
-    const [diagnostic] = validate('a }} b')
-    assert.deepEqual(diagnostic, { severity: 'warning', message: "'}}' has no matching opening delimiter", start: 2, end: 4 })
+test('ignores closing delimiters in plain text, CSS and JSON', () => {
+    assert.deepEqual(messages('<style>.a{width:100%}</style> {% schema %}{"a":{"b":{}}}{% endschema %} a }} b'), [])
+})
+
+test('ignores delimiters inside strings and inline comments', () => {
+    assert.deepEqual(messages('{% assign open = "{{" %}{% if a %}{% endif %}'), [])
+    assert.deepEqual(messages(`{{ "{%" | append: '}}' }}`), [])
+    assert.deepEqual(messages('{% # this is {{ not liquid %}'), [])
+})
+
+test('handles many unmatched end tags without searching the whole stack', () => {
+    const count = 20_000
+    const started = performance.now()
+    assert.equal(validate('{% if a %}'.repeat(count) + '{% endfor %}'.repeat(count)).length, count * 2)
+    assert.ok(performance.now() - started < 1000)
 })
 
 test('does not crash on tag names that collide with object prototype keys', () => {

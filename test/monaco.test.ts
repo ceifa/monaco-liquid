@@ -71,6 +71,20 @@ test('keeps Liquid highlighted inside HTML attributes', () => {
     assert.equal(typeOf(line, 't'), '')
 })
 
+test('keeps filter names across lines and whitespace control after identifiers', () => {
+    const [, second = []] = monaco.editor.tokenize('{{ x |\n  upcase }}', 'liquid')
+    assert.equal(second[1]?.type, 'function.liquid')
+    assert.deepEqual(tokens('{{ a-}}x').slice(2, 4), ['a=variable', '-}}=delimiter.output'])
+})
+
+test('tokenizes the first statement of a single-line liquid tag', () => {
+    assert.equal(typeOf('{%- liquid assign a = 1 -%}', 'assign'), 'keyword')
+})
+
+test('tokenizes raw blocks inside HTML attributes', () => {
+    assert.equal(typeOf('<a title="{% raw %}{{ x }}{% endraw %}">', '{{ x }}'), 'string.raw')
+})
+
 test('tokenizes comments and raw blocks', () => {
     assert.equal(typeOf('{%- comment -%} {{ x }} {%- endcomment -%}', ' {{ x }} '), 'comment')
     assert.equal(typeOf('{% raw %}{{ x }}{% endraw %}', '{{ x }}'), 'string.raw')
@@ -102,21 +116,24 @@ test('our language configuration survives the built-in liquid definition', async
     editor.dispose()
 })
 
-function complete(marked: string) {
+function complete(marked: string, triggerCharacter?: string, mode: 'insert' | 'replace' = 'insert') {
     const model = monaco.editor.createModel(marked.replace('‸', ''), 'liquid')
     const position = model.getPositionAt(marked.indexOf('‸'))
     const provider = createCompletionProvider(monaco, () => schemas)
     const result = provider.provideCompletionItems(
         model,
         position,
-        { triggerKind: monaco.languages.CompletionTriggerKind.Invoke },
+        triggerCharacter
+            ? { triggerKind: monaco.languages.CompletionTriggerKind.TriggerCharacter, triggerCharacter }
+            : { triggerKind: monaco.languages.CompletionTriggerKind.Invoke },
         new monaco.CancellationTokenSource().token,
     ) as Monaco.languages.CompletionList | null
     const suggestions = result?.suggestions ?? []
     const accept = (label: string) => {
         const item = suggestions.find((suggestion) => suggestion.label === label)
         assert.ok(item, `no suggestion '${label}'`)
-        model.applyEdits([{ range: item.range as Monaco.IRange, text: item.insertText }])
+        const range = item.range as Monaco.languages.CompletionItemRanges
+        model.applyEdits([{ range: mode === 'replace' ? range.replace : range.insert, text: item.insertText }])
         return model.getValue()
     }
     return { labels: suggestions.map((suggestion) => suggestion.label), suggestions, accept }
@@ -147,6 +164,17 @@ test('completes schema properties from the parent path', () => {
     assert.ok(top.includes('product') && top.includes('cart'))
     const detail = complete('{{ product.‸ }}').suggestions.find((suggestion) => suggestion.label === 'price')
     assert.equal(detail?.detail, 'Number')
+})
+
+test('replaces the whole word in replace mode', () => {
+    assert.equal(complete('{{ product.ti‸tle }}', undefined, 'replace').accept('title'), '{{ product.title }}')
+    assert.equal(complete('{{ product.title | up‸case }}', undefined, 'replace').accept('downcase'), '{{ product.title | downcase }}')
+})
+
+test('opens suggestions on space only where a tag or filter name goes', () => {
+    assert.deepEqual(complete('{{ product ‸', ' ').labels, [])
+    assert.ok(complete('{% ‸', ' ').labels.includes('if'))
+    assert.ok(complete('{{ x | ‸', ' ').labels.includes('upcase'))
 })
 
 test('offers nothing in plain text or strings', () => {

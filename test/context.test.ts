@@ -97,3 +97,10 @@ test('resolves a loop collection against the scope before the loop variable is b
     const scope = getScope(scan(template).nodes, template.indexOf('X'), schemas)
     assert.equal(typeName(resolve(scope, 'product.sku')!), 'String')
 })
+
+test('stays fast on a very long word before the cursor', () => {
+    const text = `{{ ${'a'.repeat(40_000)}!`
+    const started = performance.now()
+    getCursorContext(text, text.length, schemas)
+    assert.ok(performance.now() - started < 500)
+})

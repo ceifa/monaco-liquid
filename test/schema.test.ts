@@ -64,3 +64,32 @@ test('reads descriptions through wrappers', () => {
     assert.equal(describe(z.string().meta({ description: 'Meta' })), 'Meta')
     assert.equal(describe(z.string()), undefined)
 })
+
+test('resolves the built-in properties it offers', () => {
+    const tags = z.array(z.string())
+    for (const [key, schema] of keys(tags)) assert.equal(typeName(property(tags, key)!), typeName(schema))
+    assert.equal(typeName(property(tags, 'size')!), 'Number')
+    assert.equal(typeName(property(z.string(), 'size')!), 'Number')
+    assert.equal(typeName(property(z.tuple([z.string(), z.number()]), 'last')!), 'Number')
+})
+
+test('does not overflow on self-referencing unions and intersections', () => {
+    const union: z.ZodType = z.lazy(() => z.union([z.object({ a: z.string() }), union.optional()]))
+    assert.equal(typeName(property(union, 'a')!), 'String')
+    assert.deepEqual(
+        keys(union).map(([key]) => key),
+        ['a'],
+    )
+    assert.equal(element(union), undefined)
+    const intersection: z.ZodType = z.lazy(() => z.intersection(z.object({ a: z.string() }), intersection))
+    assert.equal(property(intersection, 'missing'), undefined)
+})
+
+test('does not invent properties on strict objects', () => {
+    assert.equal(property(z.strictObject({ a: z.string() }), 'missing'), undefined)
+    assert.equal(typeName(property(z.looseObject({}).catchall(z.number()), 'any')!), 'Number')
+})
+
+test('describes success as a boolean', () => {
+    assert.equal(typeName(z.success(z.string())), 'Boolean')
+})

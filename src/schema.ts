@@ -10,7 +10,10 @@ type Def = z.$ZodTypes['_zod']['def']
 // Read structurally instead of `instanceof`, so schemas from any copy of zod (or zod/mini) work.
 const defOf = (schema: Schema) => schema._zod.def as Def
 
-const WRAPPERS = new Set(['optional', 'nullable', 'default', 'prefault', 'nonoptional', 'catch', 'readonly', 'success'])
+const WRAPPERS = new Set(['optional', 'nullable', 'default', 'prefault', 'nonoptional', 'catch', 'readonly'])
+
+// Bounds recursion through self-referencing unions and intersections built with `z.lazy`.
+const MAX_DEPTH = 16
 
 export function unwrap(schema: Schema): Schema {
     const seen = new Set<Schema>()
@@ -23,75 +26,75 @@ export function unwrap(schema: Schema): Schema {
 }
 
 /** The schema of `schema[key]`, or undefined if it can't be known. */
-export function property(schema: Schema, key: string): Schema | undefined {
+export function property(schema: Schema, key: string, depth = 0): Schema | undefined {
+    if (depth > MAX_DEPTH) return undefined
     const def = defOf(unwrap(schema))
     switch (def.type) {
         case 'object':
-            return Object.hasOwn(def.shape, key) ? def.shape[key] : def.catchall
+            if (Object.hasOwn(def.shape, key)) return def.shape[key]
+            return def.catchall && defOf(def.catchall).type !== 'never' ? def.catchall : undefined
         case 'record':
             return def.valueType
         case 'array':
-            return /^\d+$/.test(key) || key === 'first' || key === 'last' ? def.element : undefined
+            return /^\d+$/.test(key) ? def.element : builtin(schema, key)
         case 'tuple':
-            if (/^\d+$/.test(key)) return def.items[Number(key)] ?? def.rest ?? undefined
-            if (key === 'first') return def.items[0] ?? def.rest ?? undefined
-            return undefined
+            return /^\d+$/.test(key) ? (def.items[Number(key)] ?? def.rest ?? undefined) : builtin(schema, key)
+        case 'string':
+            return builtin(schema, key)
         case 'intersection':
-            return property(def.left, key) ?? property(def.right, key)
-        case 'union': {
-            const options = def.options.map((option) => property(option, key)).filter((option) => option !== undefined)
-            return options.length === 0 ? undefined : options.length === 1 ? options[0] : unionOf(options)
-        }
+            return property(def.left, key, depth + 1) ?? property(def.right, key, depth + 1)
+        case 'union':
+            return unionOf(def.options.map((option) => property(option, key, depth + 1)))
         default:
             return undefined
     }
 }
 
 /** The schema of the items yielded by `{% for x in schema %}`. */
-export function element(schema: Schema): Schema | undefined {
+export function element(schema: Schema, depth = 0): Schema | undefined {
+    if (depth > MAX_DEPTH) return undefined
     const def = defOf(unwrap(schema))
     switch (def.type) {
         case 'array':
             return def.element
         case 'tuple':
-            return def.items.length === 0 ? (def.rest ?? undefined) : unionOf([...def.items, ...(def.rest ? [def.rest] : [])])
-        case 'union': {
-            const options = def.options.map(element).filter((option) => option !== undefined)
-            return options.length === 0 ? undefined : options.length === 1 ? options[0] : unionOf(options)
-        }
+            return unionOf([...def.items, def.rest ?? undefined])
+        case 'union':
+            return unionOf(def.options.map((option) => element(option, depth + 1)))
         default:
             return undefined
     }
 }
 
-/** Own keys of an object-like schema, used for completions. */
-export function keys(schema: Schema): Array<[string, Schema]> {
+/** Keys offered by completion; each resolves through `property`. */
+export function keys(schema: Schema, depth = 0): Array<[string, Schema]> {
+    if (depth > MAX_DEPTH) return []
     const def = defOf(unwrap(schema))
     switch (def.type) {
         case 'object':
             return Object.entries(def.shape)
         case 'intersection':
-            return mergeKeys([keys(def.left), keys(def.right)])
+            return mergeKeys([keys(def.left, depth + 1), keys(def.right, depth + 1)])
         case 'union':
-            return mergeKeys(def.options.map(keys))
+            return mergeKeys(def.options.map((option) => keys(option, depth + 1)))
         case 'array':
-        case 'tuple': {
-            const item = element(schema)
-            return [
-                ['size', primitive('number')],
-                ...(item
-                    ? ([
-                          ['first', item],
-                          ['last', item],
-                      ] as Array<[string, Schema]>)
-                    : []),
-            ]
-        }
+        case 'tuple':
         case 'string':
-            return [['size', primitive('number')]]
+            return ['size', 'first', 'last'].flatMap((key) => {
+                const value = builtin(schema, key)
+                return value ? [[key, value] as [string, Schema]] : []
+            })
         default:
             return []
     }
+}
+
+/** Liquid's built-in properties of arrays and strings. */
+function builtin(schema: Schema, key: string): Schema | undefined {
+    const def = defOf(unwrap(schema))
+    if (key === 'size') return primitive('number')
+    if (def.type === 'tuple' && key === 'last' && !def.rest) return def.items.at(-1)
+    return key === 'first' || key === 'last' ? element(schema) : undefined
 }
 
 function mergeKeys(groups: Array<Array<[string, Schema]>>): Array<[string, Schema]> {
@@ -109,7 +112,8 @@ export function describe(schema: Schema): string | undefined {
     const seen = new Set<Schema>()
     for (let current: Schema | undefined = schema; current && !seen.has(current); current = innerOf(current)) {
         seen.add(current)
-        const description = registry?.get(current)?.description
+        // Before zod 4.2 there is no shared registry, but classic schemas still expose `.description`.
+        const description = registry?.get(current)?.description ?? (current as { description?: unknown }).description
         if (typeof description === 'string') return description
     }
     return undefined
@@ -118,7 +122,8 @@ export function describe(schema: Schema): string | undefined {
 function innerOf(schema: Schema): Schema | undefined {
     const def = defOf(schema)
     if (WRAPPERS.has(def.type)) return (def as z.$ZodOptionalDef).innerType
-    if (def.type === 'lazy') return def.getter()
+    // `_zod.innerType` caches the getter's result, keeping recursive schemas referentially stable.
+    if (def.type === 'lazy') return (schema._zod as { innerType?: Schema }).innerType ?? def.getter()
     if (def.type === 'pipe') return defOf(def.out).type === 'transform' ? def.in : def.out
     return undefined
 }
@@ -137,7 +142,6 @@ export function typeName(schema: Schema, depth = 0): string {
         case 'nonoptional':
         case 'catch':
         case 'readonly':
-        case 'success':
         case 'lazy':
         case 'pipe':
             return next(unwrap(schema))
@@ -166,6 +170,7 @@ export function typeName(schema: Schema, depth = 0): string {
         case 'bigint':
             return 'BigInt'
         case 'boolean':
+        case 'success':
             return 'Boolean'
         case 'date':
             return 'Date'
@@ -188,7 +193,11 @@ export const primitive = (type: 'string' | 'number' | 'boolean') => fake({ type 
 
 export const objectOf = (shape: Record<string, Schema>) => fake({ type: 'object', shape })
 
-const unionOf = (options: Array<Schema>) => fake({ type: 'union', options })
+/** A union of the known options, or the single option, or undefined when none is known. */
+function unionOf(candidates: Array<Schema | undefined>): Schema | undefined {
+    const options = [...new Set(candidates)].filter((option) => option !== undefined)
+    return options.length > 1 ? fake({ type: 'union', options }) : options[0]
+}
 
 const loopShape = {
     index: primitive('number'),

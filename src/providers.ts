@@ -21,8 +21,13 @@ export function createCompletionProvider(api: MonacoApi, getSchemas: SchemaLooku
             // A space only opens suggestions right after `{%` or `|`; everywhere else it's just typing.
             if (context.triggerCharacter === ' ' && cursor.kind !== 'tag' && cursor.kind !== 'filter') return null
 
-            const word = model.getWordUntilPosition(position)
-            const range = new api.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+            // Insert replaces the typed prefix; replace (Shift+Enter by default) also takes the rest of the word.
+            const word = model.getWordAtPosition(position)
+            const start = word?.startColumn ?? position.column
+            const range = {
+                insert: new api.Range(position.lineNumber, start, position.lineNumber, position.column),
+                replace: new api.Range(position.lineNumber, start, position.lineNumber, word?.endColumn ?? position.column),
+            }
             const item = (label: string, kind: monaco.languages.CompletionItemKind, sort: number, detail?: string) => ({
                 label,
                 kind,
